@@ -1,25 +1,36 @@
-FROM eclipse-temurin:17-jdk-alpine
+# ----------- BUILD STAGE -----------
+FROM eclipse-temurin:17-jdk-alpine AS build
 
 WORKDIR /app
 
-# Copiem Maven Wrapper i pom
-COPY mvnw pom.xml ./
+# Copiar Maven Wrapper i fitxers base
+COPY mvnw .
 COPY .mvn .mvn
+COPY pom.xml .
 
-# Donem permisos a mvnw
+# Donar permisos d'execució
 RUN chmod +x mvnw
 
-# Baixem dependències offline
-RUN ./mvnw dependency:go-offline
+# Descarregar dependències
+RUN ./mvnw dependency:resolve
 
-# Copiem codi
-COPY src ./src
+# Copiar codi font
+COPY src src
 
-# Compilem el projecte sense tests
+# Compilar aplicació
 RUN ./mvnw clean package -DskipTests
 
-# Expose port 8080
+
+# ----------- RUNTIME STAGE -----------
+FROM eclipse-temurin:17-jre-alpine
+
+WORKDIR /app
+
+# Copiar el jar generat
+COPY --from=build /app/target/*.jar app.jar
+
+# Port utilitzat per Spring Boot
 EXPOSE 8080
 
-# Start command
-CMD ["java", "-jar", "target/cloudapi-0.0.1-SNAPSHOT.jar"]
+# Arrencar aplicació
+ENTRYPOINT ["java","-jar","app.jar"]
