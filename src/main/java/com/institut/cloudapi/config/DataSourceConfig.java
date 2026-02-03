@@ -6,6 +6,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.core.env.Environment;
 import org.springframework.boot.jdbc.DataSourceBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
 import java.net.URI;
@@ -17,17 +19,49 @@ public class DataSourceConfig {
     @Value("${spring.datasource.driver-class-name:org.postgresql.Driver}")
     private String driverClassName;
 
+    private static final Logger log = LoggerFactory.getLogger(DataSourceConfig.class);
+
     @Bean
     @Primary
     public DataSource dataSource(Environment env) {
-        // Prefer explicit DB_URL if provided (expects a JDBC URL)
+        // Try multiple environment variable names in order of preference
         String dbUrl = env.getProperty("DB_URL");
         String dbUser = env.getProperty("DB_USER");
         String dbPassword = env.getProperty("DB_PASSWORD");
 
         if (dbUrl != null && !dbUrl.isBlank()) {
+            String url = dbUrl.trim();
+            // Convert postgres://user:pass@host:port/db into JDBC url when supplied in DB_URL
+            if (url.startsWith("postgres://") || url.startsWith("postgresql://")) {
+                try {
+                    URI uri = new URI(url);
+                    String userInfo = uri.getUserInfo();
+                    String username = dbUser;
+                    String password = dbPassword;
+                    if (userInfo != null) {
+                        String[] parts = userInfo.split(":", 2);
+                        username = parts[0];
+                        if (parts.length > 1) password = parts[1];
+                    }
+
+                    StringBuilder sb = new StringBuilder();
+                    sb.append("jdbc:postgresql://")
+                            .append(uri.getHost())
+                            .append(uri.getPort() == -1 ? "" : ":" + uri.getPort())
+                            .append(uri.getPath());
+                    if (uri.getQuery() != null && !uri.getQuery().isBlank()) sb.append("?").append(uri.getQuery());
+
+                    url = sb.toString();
+                    dbUser = username;
+                    dbPassword = password;
+                } catch (URISyntaxException e) {
+                    throw new IllegalStateException("Invalid DB_URL format", e);
+                }
+            }
+
+            log.info("Using database configuration from DB_URL/JDBC string");
             return DataSourceBuilder.create()
-                    .url(dbUrl)
+                    .url(url)
                     .username(dbUser)
                     .password(dbPassword)
                     .driverClassName(driverClassName)
@@ -39,6 +73,7 @@ public class DataSourceConfig {
         if (jdbcDatabaseUrl != null && !jdbcDatabaseUrl.isBlank()) {
             String jdbcUser = env.getProperty("JDBC_DATABASE_USERNAME", dbUser);
             String jdbcPass = env.getProperty("JDBC_DATABASE_PASSWORD", dbPassword);
+            log.info("Using database configuration from JDBC_DATABASE_URL");
             return DataSourceBuilder.create()
                     .url(jdbcDatabaseUrl)
                     .username(jdbcUser)
@@ -72,6 +107,7 @@ public class DataSourceConfig {
                     url.append("?").append(uri.getQuery());
                 }
 
+                log.info("Using database configuration from DATABASE_URL (converted to JDBC)");
                 return DataSourceBuilder.create()
                         .url(url.toString())
                         .username(username)
@@ -84,7 +120,6 @@ public class DataSourceConfig {
             }
         }
 
-        // If nothing is provided, return default builder which will let Spring Boot try auto-config
-        return DataSourceBuilder.create().driverClassName(driverClassName).build();
+        throw new IllegalStateException("No database configuration found. Set one of: DB_URL (jdbc:postgresql://...), JDBC_DATABASE_URL, or DATABASE_URL (postgres://user:pass@host:port/db). Useful env examples: DB_URL=jdbc:postgresql://host:5432/dbname with DB_USER and DB_PASSWORD, or set DATABASE_URL provided by some PaaS.");
     }
 }
