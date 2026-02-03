@@ -1,7 +1,7 @@
-package com.gabriela.cloudapi.service;
+package com.institut.cloudapi.service;
 
-import com.gabriela.cloudapi.model.Book;
-import com.gabriela.cloudapi.repository.BookRepository;
+import com.institut.cloudapi.model.Book;
+import com.institut.cloudapi.repository.BookRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;

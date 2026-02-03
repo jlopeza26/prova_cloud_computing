@@ -1,7 +1,7 @@
-package com.gabriela.cloudapi.controller;
+package com.institut.cloudapi.controller;
 
-import com.gabriela.cloudapi.model.Book;
-import com.gabriela.cloudapi.service.BookService;
+import com.institut.cloudapi.model.Book;
+import com.institut.cloudapi.service.BookService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
