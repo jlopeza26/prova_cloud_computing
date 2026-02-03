@@ -1,4 +1,4 @@
-package com.institut.cloudapi.model;
+package com.gabriela.cloudapi.model;
 
 import jakarta.persistence.*;
 
